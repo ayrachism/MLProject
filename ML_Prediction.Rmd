@@ -1,0 +1,147 @@
+---
+title: "Prediction Project"
+author: "Ayushi Rashi"
+date: "20/09/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+# Prediction Using Machine Learning: A Project for the course Practical Machine Learning
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har>.
+
+## Data
+
+Link for overall project:<http://groupware.les.inf.puc-rio.br/har>  
+Link for training data: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>  
+Link for testing data: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+## Course Project Objectives
+
+- Predict the exercise behaviour  
+- Report on model building, cross validation, expected out of sample error and rationale behind the prediction model choices  
+- Test of the prediction model on 20 different test cases  
+
+## Building the Model
+
+Outcome variable `classe` is a factor variable identifying whether the participant is carrying out the specified execution of the exercise (class A) or any common mistake in classification like throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).  
+
+As our prediction requires classification, we can try out decision tree model and random forest model. The final model can be chosen according to higer accuracy in test data.
+
+## Loading data
+
+```{r}
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+```
+
+## Preprocessing the data
+
+Removing predictors with near zero variance
+```{r}
+training<-training[,colSums(is.na(training)) == 0]
+testing <-testing[,colSums(is.na(testing)) == 0]
+```
+Removing predictors that given to be non-predictors ie user_name, raw_timestamp_part_1, raw_timestamp_part_,2 cvtd_timestamp, new_window, and  num_window (columns 1 to 7) 
+```{r}
+training <- training[,-c(1:7)]
+testing <- testing[,-c(1:7)]
+```
+Final dimensions of the dataset
+```{r}
+dim(training)
+dim(testing)
+```
+
+## Creating Validation Dataset
+
+As no separate crossvalidation data is given, we can split our training data into two parts with 70% representing training and rest 25% representing validation dataset. The model that works best on validation dataset would be selected finally and applied on test dataset.  
+
+As described, we will split the training data in 70:30 ratio to get data for validation. 
+
+```{r}
+library(caret)
+set.seed(4563)
+inValidtn <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+subTraining <- training[inValidtn, ] 
+subValidtn <- training[-inValidtn, ]
+dim(subTraining)
+dim(subValidtn)
+```
+
+## Plotting the frequency of the variables
+
+```{r}
+library(ggplot2)
+qplot(subTraining$classe, xlab = "Class", ylab = "Frequency", main = "Frequency Plot")
+```
+
+## Machine Learning Algorithm 1: Decision Tree
+
+Building our prediction model using `rpart` package.
+
+```{r}
+library(rpart)
+modelDT <- rpart(classe ~ ., data = subTraining, method = "class")
+```
+
+Using `rattle` package to view the decision tree. 
+
+```{r}
+library(rattle)
+fancyRpartPlot(modelDT)
+```
+
+Testing the prediction on validation dataset.
+
+```{r}
+predDT <- predict(modelDT, subValidtn, type = "class")
+```
+
+Viewing results using confusion matrix.
+
+```{r}
+confusionMatrix(data = predDT, reference = as.factor(subValidtn$classe))
+```
+
+## Machine Learning Algorithm 1: Random Forests
+
+Building our prediction model using `randomForest` package.
+
+```{r}
+library(randomForest)
+modelRF <- randomForest(as.factor(classe) ~ ., data = subTraining)
+```
+
+Testing the prediction on validation dataset.
+
+```{r}
+predRF <- predict(modelRF, subValidtn, type = "class")
+```
+
+Viewing results using confusion matrix.
+
+```{r}
+confusionMatrix(data = predRF, reference = as.factor(subValidtn$classe))
+```
+
+## Deciding the better Algorithm
+
+Accuracy in Decision Trees: 0.7162   
+Accuracy in Random Forests: 0.9961    
+  
+Hence, Random Forest yields better results.
+
+## Predicting for test dataset values
+
+```{r}
+predTest <- predict(modelRF, testing, type = "class")
+predTest
+```
